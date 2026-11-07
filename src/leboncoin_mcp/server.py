@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
 from . import messaging
@@ -67,9 +68,28 @@ async def get_conversation(conversation_id: str) -> dict[str, Any]:
         return await messaging.get_conversation(page, settings, conversation_id)
 
 
+def transport_security(allowed_hosts: tuple[str, ...]) -> TransportSecuritySettings:
+    """Reject requests whose `Host` or `Origin` is not ours.
+
+    This stops DNS rebinding: a web page you visit pointing its own domain at 127.0.0.1 so your
+    browser calls this server. The SDK only enables it when listening on localhost, and in Docker
+    we listen on 0.0.0.0, so it is configured explicitly.
+    """
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=list(allowed_hosts),
+        allowed_origins=[f"{scheme}://{h}" for h in allowed_hosts for scheme in ("http", "https")],
+    )
+
+
 def main() -> None:
     if settings.transport == "streamable-http":
-        mcp.run("streamable-http", host=settings.host, port=settings.port)
+        mcp.run(
+            "streamable-http",
+            host=settings.host,
+            port=settings.port,
+            transport_security=transport_security(settings.allowed_hosts),
+        )
     else:
         mcp.run("stdio")
 

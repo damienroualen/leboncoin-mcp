@@ -73,6 +73,9 @@ restarts. Log in again in noVNC whenever `session_status` says the session expir
 
 - Both ports are bound to `127.0.0.1` only. The Chrome DevTools port is not published at all:
   anyone who reaches it controls your logged-in browser.
+- Requests whose `Host` or `Origin` header is not local are refused, so a web page you visit
+  cannot reach the server through your browser (DNS rebinding). Reaching it under another name
+  requires adding that name to `LEBONCOIN_MCP_ALLOWED_HOSTS`.
 - **The MCP endpoint has no authentication yet.** Do not expose it beyond your machine, and do
   not publish noVNC either: it shows your logged-in session without a password.
 - The browser container gets `SYS_ADMIN` so Chrome can keep its sandbox. Chrome itself runs as
@@ -89,6 +92,7 @@ Set in `compose.yaml` (`mcp` service):
 | `LEBONCOIN_MCP_TRANSPORT` | `stdio` | `stdio` or `streamable-http` |
 | `LEBONCOIN_MCP_HOST` | `127.0.0.1` | HTTP listen address |
 | `LEBONCOIN_MCP_PORT` | `8000` | HTTP listen port |
+| `LEBONCOIN_MCP_ALLOWED_HOSTS` | *(none)* | Extra accepted `Host` headers, comma-separated (`name:*` = any port). Local hosts are always accepted. |
 | `LEBONCOIN_MCP_NOVNC_URL` | `http://localhost:6080/vnc.html?…` | URL shown in "log in" / "solve the CAPTCHA" errors |
 
 ## Development
