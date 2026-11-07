@@ -10,11 +10,10 @@ from typing import Any
 from urllib.parse import quote
 
 from playwright.async_api import Page, Response
-from playwright.async_api import TimeoutError as PlaywrightTimeout
 
+from .capture import capture_json
 from .config import Settings
-from .errors import BlockedByDataDome, UnexpectedResponse
-from .guards import check_page
+from .landlord import tenant_profile_ref
 
 INBOX_URL = "https://www.leboncoin.fr/messages"
 CONVERSATION_URL = "https://www.leboncoin.fr/messages/id/{cid}"
@@ -50,14 +49,19 @@ def parse_message(raw: dict[str, Any]) -> dict[str, Any]:
         author = "integration"
     else:
         author = "me" if raw.get("outgoing") else "partner"
-    return {
+    attributes = raw.get("typeAttributes") or {}
+    message = {
         "id": raw.get("id"),
         "at": raw.get("sentAt") or raw.get("date"),
         "author": author,
         "type": kind,
-        "text": raw.get("text") or "",
+        "text": "\n".join(t for t in (attributes.get("header"), raw.get("text")) if t),
         "attachments": len(raw.get("attachments") or []),
     }
+    if attributes.get("link"):
+        # A button in the conversation, e.g. « Voir son profil locataire ».
+        message["action"] = {"label": attributes.get("label") or "", "url": attributes["link"]}
+    return message
 
 
 def parse_history(body: dict[str, Any]) -> list[dict[str, Any]]:
@@ -67,27 +71,6 @@ def parse_history(body: dict[str, Any]) -> list[dict[str, Any]]:
 
 def is_conversation_list(response: Response) -> bool:
     return CONVERSATIONS_PATH in response.url and response.request.method == "GET"
-
-
-async def capture_json(
-    page: Page, settings: Settings, url: str, matches: Any, what: str
-) -> dict[str, Any]:
-    """Open `url` and return the JSON of the first response accepted by `matches`."""
-    try:
-        # Arm the wait *before* navigating, or a fast response would be missed.
-        async with page.expect_response(matches) as captured:
-            await page.goto(url, wait_until="domcontentloaded")
-        response = await captured.value
-    except PlaywrightTimeout:
-        await check_page(page, settings.novnc_url)
-        raise UnexpectedResponse(f"The page loaded without {what}.") from None
-
-    await check_page(page, settings.novnc_url)
-    if response.status == 403:
-        raise BlockedByDataDome(what, settings.novnc_url)
-    if response.status != 200:
-        raise UnexpectedResponse(f"{what}: HTTP {response.status}")
-    return await response.json()
 
 
 async def open_inbox(page: Page, settings: Settings) -> dict[str, Any]:
@@ -109,6 +92,15 @@ async def list_conversations(
     }
 
 
+def latest_tenant_profile(messages: list[dict[str, Any]]) -> dict[str, str] | None:
+    """The most recent tenant profile shared in a conversation, if any."""
+    for message in reversed(messages):
+        ref = tenant_profile_ref((message.get("action") or {}).get("url", ""))
+        if ref:
+            return ref
+    return None
+
+
 async def get_conversation(
     page: Page, settings: Settings, conversation_id: str
 ) -> dict[str, Any]:
@@ -121,4 +113,9 @@ async def get_conversation(
     body = await capture_json(
         page, settings, CONVERSATION_URL.format(cid=cid), is_history, "the conversation history"
     )
-    return {"conversation_id": conversation_id, "messages": parse_history(body)}
+    messages = parse_history(body)
+    return {
+        "conversation_id": conversation_id,
+        "tenant_profile": latest_tenant_profile(messages),
+        "messages": messages,
+    }

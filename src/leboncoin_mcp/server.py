@@ -10,7 +10,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
-from . import messaging
+from . import landlord, messaging
 from .browser import BrowserSession
 from .config import Settings
 from .errors import LeboncoinError
@@ -62,10 +62,24 @@ async def get_conversation(conversation_id: str) -> dict[str, Any]:
     """Read one conversation's history, oldest first. This may mark it as read.
 
     Message `author` is "me", "partner", "system" (Leboncoin prompts) or "integration"
-    (offers and transaction events).
+    (offers and transaction events). Messages with a button have an `action` (label, url).
+    `tenant_profile` is set when the person shared their tenant profile: pass its `ad_id` and
+    `user_id` to `get_tenant_profile`.
     """
     async with session.page() as page:
         return await messaging.get_conversation(page, settings, conversation_id)
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def get_tenant_profile(ad_id: str, user_id: str) -> dict[str, Any]:
+    """Read the tenant profile (« profil locataire ») a candidate shared for one of my rentals.
+
+    Take `ad_id` and `user_id` from `get_conversation`'s `tenant_profile`. Returns contact
+    details, income, professional status, guarantor, household size and move-in wishes, as
+    entered by the candidate. This is personal data: use it only to assess the application.
+    """
+    async with session.page() as page:
+        return await landlord.get_tenant_profile(page, settings, ad_id, user_id)
 
 
 def transport_security(allowed_hosts: tuple[str, ...]) -> TransportSecuritySettings:

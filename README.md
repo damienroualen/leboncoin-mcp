@@ -26,9 +26,10 @@ Early, read-only. Available tools:
 | --- | --- |
 | `session_status` | Checks that the session works; tells you what to do if it does not. |
 | `list_conversations` | The 50 most recent conversations, optionally unread only. |
-| `get_conversation` | One conversation's history, oldest first. May mark it as read. |
+| `get_conversation` | One conversation's history, oldest first. May mark it as read. Says when the person shared a tenant profile. |
+| `get_tenant_profile` | A tenant profile (« profil locataire ») a candidate shared for one of your rentals: contact details, income, job, guarantor, household, move-in wishes. |
 
-Planned: sending messages, managing and publishing ads, the landlord space
+Planned: sending messages, managing and publishing ads, more of the landlord space
 (« espace bailleur »).
 
 ## Principles
@@ -40,6 +41,8 @@ Planned: sending messages, managing and publishing ads, the landlord space
   instead of calling Leboncoin's API directly, runs one browser operation at a time, and never
   retries a refusal.
 - **Your session stays yours.** Cookies and auth headers are never logged or returned.
+- **Other people's data stays private.** Messages and tenant profiles are returned to your
+  assistant only, never logged or stored by the server.
 
 ## Requirements
 
