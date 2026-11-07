@@ -1,0 +1,51 @@
+name: leboncoin-mcp
+
+services:
+  browser:
+    build: docker/browser
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    shm_size: 1gb
+    # Lets Chrome's setuid sandbox create namespaces, blocked by Docker's default seccomp profile.
+    # Chrome still runs as a non-root user; the alternative, --no-sandbox, would remove the sandbox.
+    cap_add:
+      - SYS_ADMIN
+    environment:
+      TZ: Europe/Paris
+      LANG: fr_FR.UTF-8
+    ports:
+      # Local only. The CDP port (9222) is deliberately not published.
+      - "127.0.0.1:6080:6080"
+    volumes:
+      - chrome-profile:/data/chrome
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9222/json/version"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  mcp:
+    build:
+      context: .
+      dockerfile: docker/mcp/Dockerfile
+    init: true
+    restart: unless-stopped
+    environment:
+      LEBONCOIN_MCP_CDP_URL: http://browser:9222
+      LEBONCOIN_MCP_TRANSPORT: streamable-http
+      LEBONCOIN_MCP_HOST: 0.0.0.0
+      LEBONCOIN_MCP_PORT: "8000"
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    depends_on:
+      browser:
+        condition: service_healthy
+
+volumes:
+  chrome-profile:

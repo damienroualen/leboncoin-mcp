@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "leboncoin-mcp"
+version = "0.1.0"
+description = "MCP server operating a Leboncoin account through a real, logged-in Chrome."
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dependencies = ["mcp>=2.3,<3", "playwright>=1.50"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/leboncoin_mcp"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
