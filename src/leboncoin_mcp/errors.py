@@ -50,3 +50,15 @@ class OperationTimeout(LeboncoinError):
 class UnexpectedResponse(LeboncoinError):
     """Leboncoin answered, but not with what we know how to read."""
 
+
+class SendRefused(LeboncoinError):
+    """A safety check stopped a send. Nothing reached Leboncoin."""
+
+
+class NotDelivered(LeboncoinError):
+    """The send was attempted but could not be confirmed. Read the conversation before retrying."""
+
+
+class InvalidConfirmation(LeboncoinError):
+    def __init__(self) -> None:
+        super().__init__("Unknown, used or expired token: prepare the action again.")

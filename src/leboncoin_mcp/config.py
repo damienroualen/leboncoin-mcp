@@ -8,6 +8,12 @@ from dataclasses import dataclass
 LOCAL_HOSTS = ("127.0.0.1:*", "localhost:*", "[::1]:*")
 
 
+def parse_bool(value: str | None, default: bool) -> bool:
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() not in ("0", "false", "no", "off")
+
+
 def parse_hosts(value: str | None) -> tuple[str, ...]:
     """Comma-separated `Host` header values; `name:*` accepts any port."""
     extra = tuple(h.strip() for h in (value or "").split(",") if h.strip())
@@ -22,6 +28,8 @@ class Settings:
     port: int = 8000
     transport: str = "stdio"
     allowed_hosts: tuple[str, ...] = LOCAL_HOSTS
+    confirm_sends: bool = True
+    confirm_ttl_s: float = 600.0
     lock_timeout_s: float = 30.0
     operation_timeout_s: float = 60.0
     navigation_timeout_ms: int = 30_000
@@ -36,4 +44,5 @@ class Settings:
             port=int(os.getenv("LEBONCOIN_MCP_PORT", defaults.port)),
             transport=os.getenv("LEBONCOIN_MCP_TRANSPORT", defaults.transport),
             allowed_hosts=parse_hosts(os.getenv("LEBONCOIN_MCP_ALLOWED_HOSTS")),
+            confirm_sends=parse_bool(os.getenv("LEBONCOIN_MCP_CONFIRM_SENDS"), True),
         )

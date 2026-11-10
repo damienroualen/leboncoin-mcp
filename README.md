@@ -20,16 +20,18 @@ you ──noVNC (login, CAPTCHA)─────────┘
 
 ## Status
 
-Early, read-only. Available tools:
+Early (alpha). Available tools:
 
 | Tool | What it does |
 | --- | --- |
 | `session_status` | Checks that the session works; tells you what to do if it does not. |
 | `list_conversations` | The 50 most recent conversations, optionally unread only. |
 | `get_conversation` | One conversation's history, oldest first. May mark it as read. Says when the person shared a tenant profile. |
+| `send_message` | Sends a message in one conversation. By default it only returns a preview and a token. |
+| `confirm_action` | Carries out a prepared action (a send) after you approved its preview. |
 | `get_tenant_profile` | A tenant profile (« profil locataire ») a candidate shared for one of your rentals: contact details, income, job, guarantor, household, move-in wishes. |
 
-Planned: sending messages, managing and publishing ads, more of the landlord space
+Planned: managing and publishing ads, more of the landlord space
 (« espace bailleur »).
 
 ## Principles
@@ -40,6 +42,11 @@ Planned: sending messages, managing and publishing ads, more of the landlord spa
 - **Looks like a person, not a scraper.** It reads what the real pages load for themselves
   instead of calling Leboncoin's API directly, runs one browser operation at a time, and never
   retries a refusal.
+- **You approve what is sent.** By default `send_message` sends nothing: it returns the
+  recipient, the ad, the last messages and the exact text, and only `confirm_action` sends it.
+  In the browser, a network guard lets the send through only if it goes to that conversation
+  with exactly that text. Repeating your last message is refused, and every send is checked
+  afterwards by reading the conversation again.
 - **Your session stays yours.** Cookies and auth headers are never logged or returned.
 - **Other people's data stays private.** Messages and tenant profiles are returned to your
   assistant only, never logged or stored by the server.
@@ -79,6 +86,8 @@ restarts. Log in again in noVNC whenever `session_status` says the session expir
 - Requests whose `Host` or `Origin` header is not local are refused, so a web page you visit
   cannot reach the server through your browser (DNS rebinding). Reaching it under another name
   requires adding that name to `LEBONCOIN_MCP_ALLOWED_HOSTS`.
+- Messages come from strangers. Treat their content as untrusted: an assistant must not follow
+  instructions found in a message. Keeping confirmation on is the safeguard.
 - **The MCP endpoint has no authentication yet.** Do not expose it beyond your machine, and do
   not publish noVNC either: it shows your logged-in session without a password.
 - The browser container gets `SYS_ADMIN` so Chrome can keep its sandbox. Chrome itself runs as
@@ -96,6 +105,7 @@ Set in `compose.yaml` (`mcp` service):
 | `LEBONCOIN_MCP_HOST` | `127.0.0.1` | HTTP listen address |
 | `LEBONCOIN_MCP_PORT` | `8000` | HTTP listen port |
 | `LEBONCOIN_MCP_ALLOWED_HOSTS` | *(none)* | Extra accepted `Host` headers, comma-separated (`name:*` = any port). Local hosts are always accepted. |
+| `LEBONCOIN_MCP_CONFIRM_SENDS` | `true` | `false` sends messages directly, without the preview and `confirm_action` step |
 | `LEBONCOIN_MCP_NOVNC_URL` | `http://localhost:6080/vnc.html?…` | URL shown in "log in" / "solve the CAPTCHA" errors |
 
 ## Development
