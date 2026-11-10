@@ -86,6 +86,9 @@ class BrowserSession:
             # contexts[0] is the real profile, with its cookies. A new context would be logged out.
             page = await browser.contexts[0].new_page()
             page.set_default_timeout(self._settings.navigation_timeout_ms)
+            # Leboncoin's messaging app does not render in a background tab (seen when someone
+            # was using another tab in noVNC). Our tab must be the visible one.
+            await page.bring_to_front()
             try:
                 async with asyncio.timeout(self._settings.operation_timeout_s):
                     yield page

@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from mcp.server.mcpserver.exceptions import ToolError
 
-class LeboncoinError(Exception):
-    """Base class for every expected failure."""
+
+class LeboncoinError(ToolError):
+    """Base class for every expected failure.
+
+    Being a `ToolError`, its message reaches the client. Any other exception is treated by the
+    MCP SDK as a crash and reported without its text.
+    """
 
 
 class CaptchaRequired(LeboncoinError):
@@ -43,3 +49,4 @@ class OperationTimeout(LeboncoinError):
 
 class UnexpectedResponse(LeboncoinError):
     """Leboncoin answered, but not with what we know how to read."""
+
