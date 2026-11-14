@@ -10,7 +10,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
-from . import landlord, messaging
+from . import ads, landlord, messaging
 from .browser import BrowserSession
 from .config import Settings
 from .confirm import PendingActions
@@ -36,6 +36,9 @@ mcp = MCPServer("leboncoin", lifespan=lifespan)
 READ_ONLY = ToolAnnotations(read_only_hint=True, open_world_hint=True)
 WRITE = ToolAnnotations(
     read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=True
+)
+DESTRUCTIVE = ToolAnnotations(
+    read_only_hint=False, destructive_hint=True, idempotent_hint=False, open_world_hint=True
 )
 
 
@@ -88,6 +91,17 @@ async def get_tenant_profile(ad_id: str, user_id: str) -> dict[str, Any]:
         return await landlord.get_tenant_profile(page, settings, ad_id, user_id)
 
 
+@mcp.tool(annotations=READ_ONLY)
+async def list_ads() -> dict[str, Any]:
+    """List my ads (« Mes annonces »), newest first, including paused and inactive ones.
+
+    Each has `ad_id`, `title`, `status` ("active", "paused", "inactive" while being reviewed…),
+    `category`, `price` in euros and the number of `photos`.
+    """
+    async with session.page() as page:
+        return await ads.list_ads(page, settings)
+
+
 @mcp.tool(annotations=WRITE)
 async def send_message(conversation_id: str, text: str) -> dict[str, Any]:
     """Send `text` as a message in one conversation, identified by its `conversation_id`.
@@ -117,16 +131,38 @@ async def send_message(conversation_id: str, text: str) -> dict[str, Any]:
         return await messaging.send_message(page, settings, conversation_id, text)
 
 
-@mcp.tool(annotations=WRITE)
+@mcp.tool(annotations=DESTRUCTIVE)
+async def delete_ad(ad_id: str) -> dict[str, Any]:
+    """Delete one of my ads, identified by its `ad_id` from `list_ads`. This cannot be undone.
+
+    Nothing is deleted yet: the result has `status: "confirmation_required"`, a `preview` of the
+    ad (title, status, price) and a `token`. Show the preview to the user, and call
+    `confirm_action(token)` only after they approve deleting that ad. Never confirm on your own
+    initiative. Deleting always asks for confirmation, whatever the server's settings.
+    """
+    async with session.page() as page:
+        preview = await ads.preview_delete(page, settings, ad_id)
+    token = pending.add("delete_ad", {"ad_id": ad_id})
+    return {
+        "status": "confirmation_required",
+        "token": token,
+        "expires_in_s": int(pending.ttl_s),
+        "preview": preview,
+    }
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
 async def confirm_action(token: str) -> dict[str, Any]:
-    """Carry out an action prepared earlier (e.g. by `send_message`), once the user approved it.
+    """Carry out an action prepared earlier (`send_message`, `delete_ad`), once the user approved it.
 
     A token works once and expires after a few minutes.
     """
     action = pending.take(token)
-    if action.tool == "send_message":
-        async with session.page() as page:
+    async with session.page() as page:
+        if action.tool == "send_message":
             return await messaging.send_message(page, settings, **action.args)
+        if action.tool == "delete_ad":
+            return await ads.delete_ad(page, settings, **action.args)
     raise LeboncoinError(f"Unknown action {action.tool!r}.")
 
 

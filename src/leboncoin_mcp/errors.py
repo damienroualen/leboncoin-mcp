@@ -51,11 +51,19 @@ class UnexpectedResponse(LeboncoinError):
     """Leboncoin answered, but not with what we know how to read."""
 
 
-class SendRefused(LeboncoinError):
+class ActionRefused(LeboncoinError):
+    """A safety check stopped a write. Nothing reached Leboncoin."""
+
+
+class ActionUnconfirmed(LeboncoinError):
+    """A write was attempted but could not be confirmed. Check its effect before retrying."""
+
+
+class SendRefused(ActionRefused):
     """A safety check stopped a send. Nothing reached Leboncoin."""
 
 
-class NotDelivered(LeboncoinError):
+class NotDelivered(ActionUnconfirmed):
     """The send was attempted but could not be confirmed. Read the conversation before retrying."""
 
 

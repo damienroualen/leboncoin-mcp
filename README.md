@@ -28,10 +28,12 @@ Early (alpha). Available tools:
 | `list_conversations` | The 50 most recent conversations, optionally unread only. |
 | `get_conversation` | One conversation's history, oldest first. May mark it as read. Says when the person shared a tenant profile. |
 | `send_message` | Sends a message in one conversation. By default it only returns a preview and a token. |
-| `confirm_action` | Carries out a prepared action (a send) after you approved its preview. |
+| `list_ads` | Your ads (« Mes annonces »): id, title, status, price, category, photos. |
+| `delete_ad` | Deletes one of your ads. Always returns a preview and a token first. |
+| `confirm_action` | Carries out a prepared action (a send or a delete) after you approved its preview. |
 | `get_tenant_profile` | A tenant profile (« profil locataire ») a candidate shared for one of your rentals: contact details, income, job, guarantor, household, move-in wishes. |
 
-Planned: managing and publishing ads, more of the landlord space
+Planned: publishing and editing ads, more of the landlord space
 (« espace bailleur »).
 
 ## Principles
@@ -47,6 +49,8 @@ Planned: managing and publishing ads, more of the landlord space
   In the browser, a network guard lets the send through only if it goes to that conversation
   with exactly that text. Repeating your last message is refused, and every send is checked
   afterwards by reading the conversation again.
+- **Deleting an ad always asks first**, whatever the settings. The delete goes through only if
+  the dialog shows that ad and the request names exactly that one ad.
 - **Your session stays yours.** Cookies and auth headers are never logged or returned.
 - **Other people's data stays private.** Messages and tenant profiles are returned to your
   assistant only, never logged or stored by the server.

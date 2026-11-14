@@ -17,12 +17,13 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from playwright.async_api import Error as PlaywrightError
-from playwright.async_api import Page, Response, Route
+from playwright.async_api import Page, Response
 
 from .capture import capture_json
 from .config import Settings
 from .errors import NotDelivered, SendRefused, UnexpectedResponse
 from .landlord import USER_ID, tenant_profile_ref
+from .netguard import RequestGuard
 
 INBOX_URL = "https://www.leboncoin.fr/messages"
 CONVERSATION_URL = "https://www.leboncoin.fr/messages/id/{cid}"
@@ -226,30 +227,18 @@ def send_refusal(url: str, body: bytes | None, conversation_id: str, text: str) 
     return None
 
 
-class SendGuard:
-    """Route handler that lets exactly one approved send through and aborts anything else."""
+class SendGuard(RequestGuard):
+    """Lets exactly one approved send through and aborts anything else."""
 
     PATTERN = "**/conversations/*/messages*"
 
     def __init__(self, conversation_id: str, text: str) -> None:
-        self._cid = conversation_id
-        self._text = text
-        self.decision: asyncio.Future[str | None] = asyncio.get_running_loop().create_future()
-
-    async def handle(self, route: Route) -> None:
-        request = route.request
-        if request.method != "POST":
-            await route.fallback()
-            return
-        if self.decision.done():
-            refusal: str | None = "a second send request in the same operation"
-        else:
-            refusal = send_refusal(request.url, request.post_data_buffer, self._cid, self._text)
-            self.decision.set_result(refusal)
-        if refusal:
-            await route.abort()
-        else:
-            await route.fallback()
+        super().__init__(
+            ("POST",),
+            lambda request: send_refusal(
+                request.url, request.post_data_buffer, conversation_id, text
+            ),
+        )
 
 
 async def _type_and_send(page: Page, guard: SendGuard, text: str) -> Response:
