@@ -36,8 +36,13 @@ services:
       LEBONCOIN_MCP_TRANSPORT: streamable-http
       LEBONCOIN_MCP_HOST: 0.0.0.0
       LEBONCOIN_MCP_PORT: "8000"
+      LEBONCOIN_MCP_PHOTOS_DIR: /photos
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      # Photos for new ads: tools take file names in this folder. Read-only for the server.
+      # PHOTOS_DIR picks the folder on the host (e.g. one your agent can write to).
+      - ${PHOTOS_DIR:-./photos}:/photos:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 2)"]
       interval: 5s

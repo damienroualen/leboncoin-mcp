@@ -71,8 +71,12 @@ class BrowserSession:
         return self._browser
 
     @asynccontextmanager
-    async def page(self) -> AsyncIterator[Page]:
-        """Hold the browser, open a fresh tab, and always close it afterwards."""
+    async def page(self, timeout_s: float | None = None) -> AsyncIterator[Page]:
+        """Hold the browser, open a fresh tab, and always close it afterwards.
+
+        `timeout_s` overrides the operation time limit, for long operations like filling a form.
+        """
+        limit = timeout_s or self._settings.operation_timeout_s
         try:
             async with asyncio.timeout(self._settings.lock_timeout_s):
                 await self._lock.acquire()
@@ -90,10 +94,10 @@ class BrowserSession:
             # was using another tab in noVNC). Our tab must be the visible one.
             await page.bring_to_front()
             try:
-                async with asyncio.timeout(self._settings.operation_timeout_s):
+                async with asyncio.timeout(limit):
                     yield page
             except TimeoutError:
-                raise OperationTimeout(self._settings.operation_timeout_s) from None
+                raise OperationTimeout(limit) from None
             finally:
                 # `shield` lets the close finish even if this task is cancelled again meanwhile.
                 with contextlib.suppress(Error):

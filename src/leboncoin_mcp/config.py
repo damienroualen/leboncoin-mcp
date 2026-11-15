@@ -32,7 +32,10 @@ class Settings:
     confirm_ttl_s: float = 600.0
     lock_timeout_s: float = 30.0
     operation_timeout_s: float = 60.0
+    # Filling the whole ad form at a person's pace takes a few minutes.
+    create_timeout_s: float = 300.0
     navigation_timeout_ms: int = 30_000
+    photos_dir: str = "photos"
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -45,4 +48,5 @@ class Settings:
             transport=os.getenv("LEBONCOIN_MCP_TRANSPORT", defaults.transport),
             allowed_hosts=parse_hosts(os.getenv("LEBONCOIN_MCP_ALLOWED_HOSTS")),
             confirm_sends=parse_bool(os.getenv("LEBONCOIN_MCP_CONFIRM_SENDS"), True),
+            photos_dir=os.getenv("LEBONCOIN_MCP_PHOTOS_DIR", defaults.photos_dir),
         )

@@ -29,18 +29,20 @@ Early (alpha). Available tools:
 | `get_conversation` | One conversation's history, oldest first. May mark it as read. Says when the person shared a tenant profile. |
 | `send_message` | Sends a message in one conversation. By default it only returns a preview and a token. |
 | `list_ads` | Your ads (« Mes annonces »): id, title, status, price, category, photos. |
+| `create_ad` | Publishes a rental ad (Locations or Colocations) with photos from the photos folder. Returns a preview and a token first. |
 | `delete_ad` | Deletes one of your ads. Always returns a preview and a token first. |
-| `confirm_action` | Carries out a prepared action (a send or a delete) after you approved its preview. |
+| `confirm_action` | Carries out a prepared action (a send, a new ad or a delete) after you approved its preview. |
 | `get_tenant_profile` | A tenant profile (« profil locataire ») a candidate shared for one of your rentals: contact details, income, job, guarantor, household, move-in wishes. |
 
-Planned: publishing and editing ads, more of the landlord space
+Planned: editing ads, other categories than rentals, more of the landlord space
 (« espace bailleur »).
 
 ## Principles
 
 - **No CAPTCHA or 2FA automation.** When Leboncoin shows a challenge, the tool stops and asks
   you to solve it in noVNC.
-- **No paid options.** The server never buys boosts or other paid features.
+- **No paid options.** The server never buys boosts or other paid features: when publishing an
+  ad, a network guard blocks any submit that carries one.
 - **Looks like a person, not a scraper.** It reads what the real pages load for themselves
   instead of calling Leboncoin's API directly, runs one browser operation at a time, and never
   retries a refusal.
@@ -49,6 +51,8 @@ Planned: publishing and editing ads, more of the landlord space
   In the browser, a network guard lets the send through only if it goes to that conversation
   with exactly that text. Repeating your last message is refused, and every send is checked
   afterwards by reading the conversation again.
+- **Publishing an ad always asks first.** The preview is checked against Leboncoin's own form
+  rules, and the create request goes through only if it carries exactly the approved ad.
 - **Deleting an ad always asks first**, whatever the settings. The delete goes through only if
   the dialog shows that ad and the request names exactly that one ad.
 - **Your session stays yours.** Cookies and auth headers are never logged or returned.
@@ -80,6 +84,10 @@ docker compose up -d --build --wait
 
 4. Ask your assistant to check the session, then to list your conversations.
 
+To publish an ad with photos, put them in the `photos` folder next to `compose.yaml` (or set
+`PHOTOS_DIR` to another folder, e.g. one your agent writes to), then give their file names to
+`create_ad`. The server reads that folder only, read-only.
+
 The Chrome profile is kept in the `chrome-profile` Docker volume, so you stay logged in across
 restarts. Log in again in noVNC whenever `session_status` says the session expired.
 
@@ -110,6 +118,7 @@ Set in `compose.yaml` (`mcp` service):
 | `LEBONCOIN_MCP_PORT` | `8000` | HTTP listen port |
 | `LEBONCOIN_MCP_ALLOWED_HOSTS` | *(none)* | Extra accepted `Host` headers, comma-separated (`name:*` = any port). Local hosts are always accepted. |
 | `LEBONCOIN_MCP_CONFIRM_SENDS` | `true` | `false` sends messages directly, without the preview and `confirm_action` step |
+| `LEBONCOIN_MCP_PHOTOS_DIR` | `photos` | Folder holding the photos `create_ad` uploads (`/photos` in Docker, mounted from `PHOTOS_DIR`, default `./photos`) |
 | `LEBONCOIN_MCP_NOVNC_URL` | `http://localhost:6080/vnc.html?…` | URL shown in "log in" / "solve the CAPTCHA" errors |
 
 ## Development

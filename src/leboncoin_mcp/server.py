@@ -10,7 +10,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
-from . import ads, landlord, messaging
+from . import ads, deposit, landlord, messaging
 from .browser import BrowserSession
 from .config import Settings
 from .confirm import PendingActions
@@ -131,6 +131,57 @@ async def send_message(conversation_id: str, text: str) -> dict[str, Any]:
         return await messaging.send_message(page, settings, conversation_id, text)
 
 
+@mcp.tool(annotations=WRITE)
+async def create_ad(
+    category: str,
+    title: str,
+    description: str,
+    price: int,
+    address: str,
+    photos: list[str],
+    attributes: dict[str, Any] | None = None,
+    hide_phone: bool = True,
+) -> dict[str, Any]:
+    """Prepare a new rental ad. Nothing is published yet.
+
+    - `category`: "10" (Locations) or "11" (Colocations).
+    - `title`, `description`: the exact text of the ad. `price`: monthly rent in euros, charges
+      included.
+    - `address`: street and town, e.g. "12 rue de la Paix, Pontivy". Leboncoin's matching
+      suggestion is used; the preview shows it.
+    - `photos`: file names in the server's photos folder, in display order (first = cover).
+    - `attributes`: the other form fields by key, e.g. {"real_estate_type": "Maison",
+      "furnished": "Meublé", "square": 90, "rooms": 4, "bedrooms": 3, "energy_rate": "D",
+      "ges": "D", "monthly_charges": 100, "security_deposit": 500, "available_date": "12/2026"}.
+      Choices accept the label or its id. Missing or invalid fields are all reported at once,
+      with the allowed choices: fix them and call again.
+
+    The result has `status: "confirmation_required"`, a `preview` and a `token`. Show the
+    preview to the user, and call `confirm_action(token)` only after they approve it. Never
+    confirm on your own initiative. Publishing never buys a paid option. The new ad is then
+    reviewed by Leboncoin before going online (status "inactive" in `list_ads` meanwhile).
+    """
+    values = deposit.ad_values(title, description, price, attributes or {}, hide_phone)
+    async with session.page(settings.create_timeout_s) as page:
+        preview = await deposit.preview_create(page, settings, category, address, values, photos)
+    token = pending.add(
+        "create_ad",
+        {
+            "category": category,
+            "address": address,
+            "approved_address": preview["address"],
+            "values": values,
+            "photos": photos,
+        },
+    )
+    return {
+        "status": "confirmation_required",
+        "token": token,
+        "expires_in_s": int(pending.ttl_s),
+        "preview": preview,
+    }
+
+
 @mcp.tool(annotations=DESTRUCTIVE)
 async def delete_ad(ad_id: str) -> dict[str, Any]:
     """Delete one of my ads, identified by its `ad_id` from `list_ads`. This cannot be undone.
@@ -153,11 +204,14 @@ async def delete_ad(ad_id: str) -> dict[str, Any]:
 
 @mcp.tool(annotations=DESTRUCTIVE)
 async def confirm_action(token: str) -> dict[str, Any]:
-    """Carry out an action prepared earlier (`send_message`, `delete_ad`), once the user approved it.
+    """Carry out an action prepared earlier (`send_message`, `create_ad`, `delete_ad`), once approved.
 
     A token works once and expires after a few minutes.
     """
     action = pending.take(token)
+    if action.tool == "create_ad":
+        async with session.page(settings.create_timeout_s) as page:
+            return await deposit.create_ad(page, settings, **action.args)
     async with session.page() as page:
         if action.tool == "send_message":
             return await messaging.send_message(page, settings, **action.args)
